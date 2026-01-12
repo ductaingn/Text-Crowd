@@ -236,8 +236,8 @@ class Field_Env(ORCA_Env):
 
 
 if __name__ == "__main__":
-    from Simulators.Field_Generators.CurveTracking_Field import CurveTracking_Field
-    from Simulators.Field_Generators.Navigation_Field import Navigation_Field
+    from .Field_Generators.CurveTracking_Field import CurveTracking_Field
+    from .Field_Generators.Navigation_Field import Navigation_Field
 
     agent_n = 200
     group_n = 2
