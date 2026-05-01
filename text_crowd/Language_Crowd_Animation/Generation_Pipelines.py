@@ -388,4 +388,3 @@ class Field_Generation_Pipeline:
             np.save(os.path.join(save_path, "texts.npy"), {"texts": prompts_})
 
         return np.array(fields_all)
-

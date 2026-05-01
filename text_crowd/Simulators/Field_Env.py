@@ -15,6 +15,11 @@ class Field_Env(ORCA_Env):
             agent_num=agent_num, visual=visual, draw_scale=draw_scale
         )
 
+        self.N_FLOW = 4096
+        self.TRAIL_LEN = 12
+
+        self.flow_particles = []
+
     def reset(self, scenario, agent_setting):
         super(Field_Env, self).reset(scenario, agent_setting)
         self.agent_prefvs = []
@@ -235,6 +240,14 @@ class Field_Env(ORCA_Env):
         self.viewer.set_arrows(np.array(arrows), np.array(arrow_colors))
 
 
+def sample_field_at(pos, grid, field):
+    gx = int(pos[0] / grid["grid_width"])
+    gy = int(pos[1] / grid["grid_width"])
+    if gx < 0 or gy < 0 or gx >= grid["grid_size"][0] or gy >= grid["grid_size"][1]:
+        return None
+    return field[gx][gy]
+
+
 if __name__ == "__main__":
     from .Field_Generators.CurveTracking_Field import CurveTracking_Field
     from .Field_Generators.Navigation_Field import Navigation_Field
@@ -305,6 +318,37 @@ if __name__ == "__main__":
     fld_env.reset(
         scenario=copy.deepcopy(scenario_test), agent_setting=copy.deepcopy(agent_params)
     )
+    x = np.random.uniform(0, scenario_test["wind_size"][0], fld_env.N_FLOW)
+    y = np.random.uniform(0, scenario_test["wind_size"][1], fld_env.N_FLOW)
+    for _x, _y in zip(x, y):
+        vl = fld_env.viewer.add_flow_particle(
+            trail_len=fld_env.TRAIL_LEN,
+            color=[103, 58, 183],
+        )
+
+        fld_env.flow_particles.append(
+            {
+                "vl": vl,
+                "hist": [[_x, _y]] * fld_env.TRAIL_LEN,
+                "pos": np.array([_x, _y], dtype=float),
+            }
+        )
+
+    # --- create trails for agents ---
+    fld_env.agent_trail_ids = []
+    fld_env.agent_trail_len = 15
+
+    for aid in range(agent_n):
+        pid = fld_env.viewer.add_particle(
+            radius=3.0,
+            color=fld_env.agent_current_infor[aid]["color"],
+            trail_len=fld_env.agent_trail_len,
+            decay=None,  # auto decay
+        )
+        fld_env.agent_trail_ids.append(pid)
+
+    # history buffers
+    fld_env.agent_trail_hist = [[] for _ in range(agent_n)]
 
     crv_fld = CurveTracking_Field(
         reverse_direction=False,
@@ -345,7 +389,7 @@ if __name__ == "__main__":
     grid = copy.deepcopy(crv_fld.grid)
     groups_fields[0]["field"] = copy.deepcopy(field)
     groups_fields[0]["grid"] = copy.deepcopy(grid)
-    crv_fld.field_visualization(field, guidance1)
+    # crv_fld.field_visualization(field, guidance1)
 
     # field for group 2
     grid_width = 20.0
@@ -368,10 +412,10 @@ if __name__ == "__main__":
     grid = copy.deepcopy(crv_fld.grid)
     groups_fields[1]["field"] = copy.deepcopy(field)
     groups_fields[1]["grid"] = copy.deepcopy(grid)
-    crv_fld.field_visualization(field, guidance2)
+    # crv_fld.field_visualization(field, guidance2)
 
     keyboard = pyglet.window.key.KeyStateHandler()
-    while 1:
+    while not fld_env.viewer.closed:
         fld_env.viewer.push_handlers(keyboard)
         if keyboard[pyglet.window.key.Q]:
             fld_env.set_viewer_field(
@@ -411,4 +455,62 @@ if __name__ == "__main__":
                     fld_env.set_agent_params(aid, ai_params)
                     groups_fields[gid]["agent_ids"].remove(aid)
         fld_env.perform_action(groups_fields)
-        time.sleep(0.04)
+
+        # --- update trails ---
+        for i, p in enumerate(fld_env.flow_particles):
+            v = sample_field_at(
+                p["pos"], groups_fields[0]["grid"], groups_fields[0]["field"]
+            )
+            sampled_aid = groups_fields[0]["agent_ids"][0]
+
+            if (
+                v is None
+                or np.linalg.norm(
+                    np.array(p["pos"])
+                    - np.array(fld_env.agent_current_infor[sampled_aid]["goal_pos"])
+                )
+                < 50.0
+                or np.linalg.norm(v) < 1e-6
+                or p["pos"][0] < 0
+                or p["pos"][1] < 0
+                or p["pos"][0] > scenario_test["wind_size"][0]
+                or p["pos"][1] > scenario_test["wind_size"][1]
+            ):
+                p["pos"] = [-1000, -1000]
+                fld_env.flow_particles.pop(i)
+                fld_env.viewer.flow_lines.pop(i)
+                continue
+
+            v = v / np.linalg.norm(v)
+            p["pos"] += v * 2.0  # step size
+
+            p["hist"].insert(0, p["pos"].tolist())
+            p["hist"] = p["hist"][: fld_env.TRAIL_LEN]
+
+            p["vl"].vertices = np.array(p["hist"]).reshape(-1).tolist()
+
+        x = np.random.uniform(
+            0,
+            scenario_test["wind_size"][0],
+            fld_env.N_FLOW - len(fld_env.flow_particles),
+        )
+        y = np.random.uniform(
+            0,
+            scenario_test["wind_size"][1],
+            fld_env.N_FLOW - len(fld_env.flow_particles),
+        )
+        for _x, _y in zip(x, y):
+            vl = fld_env.viewer.add_flow_particle(
+                trail_len=fld_env.TRAIL_LEN,
+                color=[0, 0, 0],
+            )
+
+            fld_env.flow_particles.append(
+                {
+                    "vl": vl,
+                    "hist": [[_x, _y]] * fld_env.TRAIL_LEN,
+                    "pos": np.array([_x, _y], dtype=float),
+                }
+            )
+
+        time.sleep(0.01)

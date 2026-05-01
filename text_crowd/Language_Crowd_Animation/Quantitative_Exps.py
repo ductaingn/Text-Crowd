@@ -1,9 +1,7 @@
-import sys
 import os, time, math, random, copy
 from pathlib import Path
 
 import cv2
-import pyglet
 import numpy as np
 import matplotlib.pyplot as plt
 from fastgrab import screenshot
@@ -13,15 +11,12 @@ from transformers import CLIPTextModel, CLIPTokenizer
 from diffusers import UNet2DConditionModel
 from diffusers import DDPMScheduler
 
-from .Generation_Pipelines import SgDistr_Generation_Pipeline
-from .Generation_Pipelines import Field_Generation_Pipeline
-from ..Utils import *
+from text_crowd.Language_Crowd_Animation.Generation_Pipelines import SgDistr_Generation_Pipeline, Field_Generation_Pipeline
+from text_crowd.Utils import *
 
-from ..Simulators.Field_Env import Field_Env
-from ..Simulators.Field_Generators.Base_Field import Base_Field
-from ..Simulators.ORCA_Env import ORCA_Env, AGNET_PARAM_DEFAULT, AGENT_SETTING_DEFAULT
-
-from .Scenario_Generator import Scenario_Generator
+from text_crowd.Simulators.Field_Env import Field_Env
+from text_crowd.Simulators.Field_Generators.Base_Field import Base_Field
+from text_crowd.Simulators.ORCA_Env import AGNET_PARAM_DEFAULT
 
 from dtaidistance import dtw, dtw_ndim
 
@@ -33,7 +28,7 @@ class Quantitative_Exp_Config:
     # dataset
     data_path = str(base_path / "Dataset" / "Data_Full_V2") + "/"
     obj_nums = [0, 1, 2, 3, 4, 5]
-    group_nums = [1, 2, 3]
+    group_nums = [2, 3]
     data_scale = 1.0
 
     # 2d sim
@@ -60,7 +55,7 @@ class Quantitative_Exp_Config:
 class Config_SgDistr_V2:
     data_path = str(base_path / "Dataset" / "Data_Full_V2") + "/"
     obj_nums = [5, 4, 3, 2, 1, 0]
-    group_nums = [1, 2, 3]
+    group_nums = [2, 3]
     data_scale = 1.0
 
     pretrained_model_name_or_path = "runwayml/stable-diffusion-v1-5"
@@ -91,7 +86,7 @@ class Config_SgDistr_V2:
 class Config_Field_V2:
     data_path = "./Dataset/Data_Full_V2/"
     obj_nums = [5, 4, 3, 2, 1, 0]
-    group_nums = [1, 2, 3]
+    group_nums = [2, 3]
     data_scale = 1.0
 
     pretrained_model_name_or_path = "runwayml/stable-diffusion-v1-5"
@@ -554,7 +549,7 @@ def main(config_exp, config_sgdistr, config_field):
                 # input text
                 input_prompts = copy.deepcopy(gt_group_descriptions)
                 if config_exp.use_complete_text:
-                    from .Behavior_Descriptor import Behavior_Descriptor
+                    from text_crowd.Language_Crowd_Animation.Behavior_Descriptor import Behavior_Descriptor
 
                     drop_out_ps = {"action_loc": 0, "obj_loc": 0, "action_dir": 0}
                     BD_ = Behavior_Descriptor(
@@ -814,4 +809,3 @@ if __name__ == "__main__":
         config_field=Config_Field_V2(),
     )
     # Quantitative_Exp_Result_from_Data(exp_config=Quantitative_Exp_Config(), data_path="./Quantitative_Exp_Data/result_full/")
-
